@@ -23,7 +23,8 @@ class SmallCNN(nn.Module):
         super(SmallCNN, self).__init__()
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)
-        self.fc1 = nn.Linear(32 * 32 * 32, 128)  # assuming input resized to 32x32
+        # self.fc1 = nn.Linear(32 * 32 * 32, 128)  # assuming input resized to 32x32
+        self.fc1 = nn.Linear(32 * 8 * 8, 128)
         self.fc2 = nn.Linear(128, num_classes)
 
     def forward(self, x):
