@@ -17,6 +17,7 @@ dataset/
 imagenet_subset/
 data/
 datasets/
+noneimages/
 
 # Large dataset files
 *.tar
