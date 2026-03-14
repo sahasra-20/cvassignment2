@@ -70,8 +70,8 @@ print("\n   SMALL CNN RESULTS   ")
 
 acc = accuracy_score(y_true,y_pred)
 
-print("Accuracy:",acc)
-print("Test Error:",1-acc)
+print("Accuracy:",acc*100,"%")
+print("Test Error:",1-acc*100,"%")
 
 print("\nConfusion Matrix")
 cm=confusion_matrix(y_true,y_pred)
@@ -148,8 +148,8 @@ print("\n    MOBILENET RESULTS    ")
 
 acc = accuracy_score(y_true_mn,y_pred_mn)
 
-print("Accuracy:",acc)
-print("Test Error:",1-acc)
+print("Accuracy:",acc*100,"%")
+print("Test Error:",1-acc*100,"%")
 
 print("\nConfusion Matrix")
 cm_mn=confusion_matrix(y_true_mn,y_pred_mn)

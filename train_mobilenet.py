@@ -31,7 +31,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # DEVICE = torch.device("cpu")
 
 BATCH_SIZE = 32
-EPOCHS = 10
+EPOCHS = 15
 IMG_SIZE = 224
 
 DATASET_PATH = "dataset"
@@ -63,26 +63,25 @@ val_transform = transforms.Compose([
                          [0.229,0.224,0.225])
 ])
 
-# Load Dataset
+from torch.utils.data import WeightedRandomSampler
 
+# Load Dataset
 
 dataset = ImageFolder(DATASET_PATH)
 
 train_size = int(0.8 * len(dataset))
 val_size = len(dataset) - train_size
 
-# validation should not use augmentation
-
 train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
+# validation should not use augmentation
 train_dataset.dataset.transform = train_transform
 val_dataset.dataset.transform = val_transform
 
-train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
 print("Training samples:", train_size)
 print("Validation samples:", val_size)
+
 
 # Compute Class Weights
 
@@ -97,23 +96,54 @@ class_weights = class_weights.to(DEVICE)
 
 print("Class weights:", class_weights)
 
+
+# -------- Weighted Sampler (NEW PART) --------
+
+train_targets = [targets[i] for i in train_dataset.indices]
+
+train_class_counts = torch.bincount(torch.tensor(train_targets))
+train_class_weights = 1.0 / train_class_counts.float()
+
+sample_weights = [train_class_weights[t] for t in train_targets]
+
+sampler = WeightedRandomSampler(
+    weights=sample_weights,
+    num_samples=len(sample_weights),
+    replacement=True
+)
+
+
+# DataLoaders
+
+train_loader = DataLoader(
+    train_dataset,
+    batch_size=BATCH_SIZE,
+    sampler=sampler
+)
+
+val_loader = DataLoader(
+    val_dataset,
+    batch_size=BATCH_SIZE,
+    shuffle=False
+)
+
+
 # Initialize Model
 
 model = mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT)
 
-# for param in model.features.parameters():
-#     param.requires_grad = False
 for param in model.features[:-3].parameters():
     param.requires_grad = False
 
-model.classifier[1] = nn.Linear(model.last_channel,5)
+model.classifier[1] = nn.Linear(model.last_channel, 5)
 model = model.to(DEVICE)
 
 params = sum(p.numel() for p in model.parameters())
 print("Total MobileNet parameters:", params)
 
+
 criterion = nn.CrossEntropyLoss(weight=class_weights)
-optimizer = optim.Adam(model.parameters(),lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=LR)
 
 best_val_acc = 0
 best_epoch=1
@@ -180,7 +210,7 @@ for epoch in range(EPOCHS):
 
     val_acc = 100 * correct / total
     
-    train_loss = train_loss / len(train_loader)
+    train_loss = train_loss
     print(f"Epoch {epoch+1}/{EPOCHS}")
     print(f"Train Loss: {train_loss:.3f}")
     print(f"Train Accuracy: {train_acc:.2f}%")
@@ -204,7 +234,7 @@ print("BEST MODEL VALIDATION RESULTS")
 print("====================================")
 
 print("Best Epoch:", best_epoch)
-print("Best Validation Accuracy:", round(best_val_acc*100,2),"%")
+print("Best Validation Accuracy:", round(best_val_acc,2),"%")
 
 cm = confusion_matrix(best_val_labels, best_val_preds)
 

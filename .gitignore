@@ -14,10 +14,9 @@ env/
 
 # Dataset folders
 dataset/
-imagenet_subset/
-data/
-datasets/
 noneimages/
+tar_files/
+extracted/
 
 # Large dataset files
 *.tar
