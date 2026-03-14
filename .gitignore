@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# Dataset folders
+dataset/
+imagenet_subset/
+data/
+datasets/
+
+# Large dataset files
+*.tar
+*.zip
+*.gz
+
+# Model weights
+*.pth
+*.pt
+*.ckpt
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.temp
