@@ -5,6 +5,11 @@ import torch.optim as optim  # Imports optimization algorithms Adam SGD RMSprop
 from sklearn.metrics import confusion_matrix, classification_report
 from collections import Counter
 
+
+from PIL import Image
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+
 from torchvision.datasets import ImageFolder
 from torchvision import transforms  # transforms are used for image preprocessing and augmentation.
 from torch.utils.data import DataLoader, random_split
@@ -31,6 +36,7 @@ BATCH_SIZE = 32
 EPOCHS = 20
 LR = 0.001
 IMG_SIZE = 32
+print("Initial Learning Rate:", LR)
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -134,7 +140,9 @@ params = sum(p.numel() for p in model.parameters())
 print("Total SmallCNN parameters:", params)
 
 criterion = nn.CrossEntropyLoss(weight=class_weights)
-optimizer = optim.Adam(model.parameters(), lr=LR)
+optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
+
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
 
 best_val_acc = 0
 best_epoch=1
@@ -201,21 +209,23 @@ for epoch in range(EPOCHS):
     val_acc = 100 * correct / total
     train_loss = train_loss
     print(f"Epoch {epoch+1}/{EPOCHS}")
+    print("Current LR:", optimizer.param_groups[0]['lr'])
     print(f"Train Loss: {train_loss:.3f}")
     print(f"Train Accuracy: {train_acc:.2f}%")
     print(f"Validation Accuracy: {val_acc:.2f}%")
     print("------------------------------------------------")
 
-
+    
     if val_acc > best_val_acc:
 
         best_val_acc = val_acc
-        best_epoch = epoch
+        best_epoch = epoch + 1
         best_val_preds = val_preds
         best_val_labels = val_labels
         torch.save(model.state_dict(), "smallcnn_model.pth")
 
         print("Best model saved!")
+    scheduler.step()
 
 print("Training complete")
 print("\n====================================")

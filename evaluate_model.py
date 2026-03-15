@@ -18,9 +18,6 @@ import os
 import psutil
 
 
-# ============================
-# MEMORY FUNCTION
-# ============================
 
 def print_memory(stage):
     process = psutil.Process(os.getpid())
@@ -59,45 +56,44 @@ y_pred = []
 
 for i,(img,label) in enumerate(loader):
 
-    img_path = dataset.samples[i][0]
+    img_path_cnn = dataset.samples[i][0]
 
-    pred = cnn_model.predict(img_path)
+    pred_cnn = cnn_model.predict(img_path_cnn)
 
     y_true.append(label.item())
-    y_pred.append(pred)
+    y_pred.append(pred_cnn)
 
 print("\n   SMALL CNN RESULTS   ")
 
-acc = accuracy_score(y_true,y_pred)
+acc_cnn = accuracy_score(y_true,y_pred)
 
-print("Accuracy:",acc*100,"%")
-print("Test Error:",1-acc*100,"%")
+print("Accuracy:",acc_cnn*100,"%")
+print("Test Error:",(1-acc_cnn)*100,"%")
 
 print("\nConfusion Matrix")
-cm=confusion_matrix(y_true,y_pred)
-print(cm)
+cm_cnn=confusion_matrix(y_true,y_pred)
+print(cm_cnn)
 
 print("\nClassification Report")
 print(classification_report(y_true,y_pred))
 
 print("\nPer-Class Accuracy")
 
-for i in range(cm.shape[0]):
+for i in range(cm_cnn.shape[0]):
 
-    acc = cm[i,i] / cm[i].sum()
+    class_acc_cnn = cm_cnn[i,i] / cm_cnn[i].sum()
 
-    print(f"Class {i} accuracy: {acc:.3f}")
+    print(f"Class {i} accuracy: {class_acc_cnn:.3f}")
 
 
-# ==============================
 # PREDICTION DISTRIBUTION
-# ==============================
+
 
 print("\nPrediction Distribution")
 
-pred_counts = Counter(y_pred)
+pred_counts_cnn= Counter(y_pred)
 
-for k,v in pred_counts.items():
+for k,v in pred_counts_cnn.items():
     print(f"Class {k}: {v} predictions")
 
 
@@ -110,13 +106,14 @@ print("\n\n==============================")
 print("EVALUATING MOBILENET")
 print("==============================")
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device_mobilenet = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 mobilenet = models.mobilenet_v2(weights=None)
 mobilenet.classifier[1] = nn.Linear(mobilenet.last_channel,5)
 
-mobilenet.load_state_dict(torch.load("mobilenet_model.pth",map_location=device))
+mobilenet.load_state_dict(torch.load("mobilenet_model.pth",map_location=device_mobilenet))
 
+mobilenet = mobilenet.to(device_mobilenet)
 mobilenet.eval()
 
 
@@ -134,7 +131,7 @@ for i,(img,label) in enumerate(loader):
     img_path = dataset.samples[i][0]
 
     image = Image.open(img_path).convert("RGB")
-    tensor = mobilenet_transform(image).unsqueeze(0)
+    tensor = mobilenet_transform(image).unsqueeze(0).to(device_mobilenet)
 
     with torch.no_grad():
 
@@ -146,10 +143,10 @@ for i,(img,label) in enumerate(loader):
 
 print("\n    MOBILENET RESULTS    ")
 
-acc = accuracy_score(y_true_mn,y_pred_mn)
+acc_mobilenet = accuracy_score(y_true_mn,y_pred_mn)
 
-print("Accuracy:",acc*100,"%")
-print("Test Error:",1-acc*100,"%")
+print("Accuracy:",acc_mobilenet*100,"%")
+print("Test Error:",(1-acc_mobilenet)*100,"%")
 
 print("\nConfusion Matrix")
 cm_mn=confusion_matrix(y_true_mn,y_pred_mn)
@@ -163,16 +160,16 @@ print("\nPer-Class Accuracy")
 
 for i in range(cm_mn.shape[0]):
 
-    acc = cm_mn[i,i] / cm_mn[i].sum()
+    class_acc_mn = cm_mn[i,i] / cm_mn[i].sum()
 
-    print(f"Class {i} accuracy: {acc:.3f}")
+    print(f"Class {i} accuracy: {class_acc_mn:.3f}")
 
 
 print("\nPrediction Distribution")
 
-pred_counts = Counter(y_pred_mn)
+pred_counts_mn = Counter(y_pred_mn)
 
-for k,v in pred_counts.items():
+for k,v in pred_counts_mn.items():
     print(f"Class {k}: {v} predictions")
 
 

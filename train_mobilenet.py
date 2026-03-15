@@ -10,6 +10,9 @@ from torchvision import models # Used to load pretrained models.
 from torch.utils.data import DataLoader, random_split
 from torchvision.models import mobilenet_v2, MobileNet_V2_Weights
 from PIL import Image
+
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 import os
 import subprocess
 import time
@@ -33,6 +36,8 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 BATCH_SIZE = 32
 EPOCHS = 15
 IMG_SIZE = 224
+LR = 0.0003
+print("Initial Learning Rate:", LR)
 
 DATASET_PATH = "dataset"
 for root, dirs, files in os.walk(DATASET_PATH):
@@ -143,7 +148,8 @@ print("Total MobileNet parameters:", params)
 
 
 criterion = nn.CrossEntropyLoss(weight=class_weights)
-optimizer = optim.Adam(model.parameters(), lr=LR)
+optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
 
 best_val_acc = 0
 best_epoch=1
@@ -212,6 +218,7 @@ for epoch in range(EPOCHS):
     
     train_loss = train_loss
     print(f"Epoch {epoch+1}/{EPOCHS}")
+    print("Current LR:", optimizer.param_groups[0]['lr'])
     print(f"Train Loss: {train_loss:.3f}")
     print(f"Train Accuracy: {train_acc:.2f}%")
     print(f"Validation Accuracy: {val_acc:.2f}%")
@@ -221,12 +228,13 @@ for epoch in range(EPOCHS):
     if val_acc > best_val_acc:
 
         best_val_acc = val_acc
-        best_epoch = epoch
+        best_epoch = epoch + 1
         best_val_preds = val_preds
         best_val_labels = val_labels
         torch.save(model.state_dict(), "mobilenet_model.pth")
 
         print("Best model saved!")
+    scheduler.step()
 
 print("Training complete")
 print("\n====================================")
