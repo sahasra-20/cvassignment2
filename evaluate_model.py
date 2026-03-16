@@ -174,3 +174,15 @@ for k,v in pred_counts_mn.items():
 
 
 print_memory("After MobileNet evaluation") 
+
+if os.path.exists("smallcnn_model.pth"):
+
+    size = os.path.getsize("smallcnn_model.pth")/(1024*1024)
+
+    print("SmallCNN model size:",round(size,2),"MB")
+
+if os.path.exists("mobilenet_model.pth"):
+
+    size = os.path.getsize("mobilenet_model.pth")/(1024*1024)
+
+    print("MobileNet model size:",round(size,2),"MB")

@@ -4,6 +4,10 @@ import torch.optim as optim
 from sklearn.metrics import confusion_matrix, classification_report
 from collections import Counter
 
+import torch.quantization
+
+from torch.utils.data import WeightedRandomSampler
+
 from torchvision.datasets import ImageFolder
 from torchvision import transforms
 from torchvision import models # Used to load pretrained models.
@@ -13,25 +17,31 @@ from PIL import Image
 
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
+
+from sklearn.model_selection import train_test_split
+from torch.utils.data import Subset
+
 import os
-import subprocess
+# import subprocess
 import time
 import os
-import psutil
+# import psutil
 
 
-# ============================
+
 # MEMORY FUNCTION
-# ============================
 
-def print_memory(stage):
-    process = psutil.Process(os.getpid())
-    mem = process.memory_info().rss / (1024**2)
-    print(f"[MEMORY] {stage}: {mem:.2f} MB")
+
+# def print_memory(stage):
+#     process = psutil.Process(os.getpid())
+#     mem = process.memory_info().rss / (1024**2)
+#     print(f"[MEMORY] {stage}: {mem:.2f} MB")
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # DEVICE = torch.device("cpu")
+
+DATASET_PATH = "dataset"
 
 BATCH_SIZE = 32
 EPOCHS = 15
@@ -39,21 +49,27 @@ IMG_SIZE = 224
 LR = 0.0003
 print("Initial Learning Rate:", LR)
 
-DATASET_PATH = "dataset"
 for root, dirs, files in os.walk(DATASET_PATH):
     for file in files:
-        path = os.path.join(root, file)
+        path = os.path.join(root, file) #Create full path like: dataset/vehicle/img1.jpg
         try:
             img = Image.open(path)
             img.verify()
         except:
             print("Removing corrupt:", path)
             os.remove(path)
+
+
 train_transform = transforms.Compose([
-    transforms.Resize((IMG_SIZE,IMG_SIZE)),
+    # transforms.Resize((IMG_SIZE,IMG_SIZE)),
+    transforms.RandomResizedCrop(IMG_SIZE),
     transforms.RandomHorizontalFlip(),
-    transforms.RandomRotation(15),
-    transforms.ColorJitter(brightness=0.2,contrast=0.2),
+    transforms.RandomRotation(12),
+    transforms.ColorJitter(
+    brightness=0.2,
+    contrast=0.2,
+    saturation=0.2
+),
     transforms.ToTensor(),
     transforms.Normalize([0.485,0.456,0.406],
                          [0.229,0.224,0.225])
@@ -68,30 +84,39 @@ val_transform = transforms.Compose([
                          [0.229,0.224,0.225])
 ])
 
-from torch.utils.data import WeightedRandomSampler
+# from torch.utils.data import WeightedRandomSampler
 
 # Load Dataset
 
 dataset = ImageFolder(DATASET_PATH)
 
-train_size = int(0.8 * len(dataset))
-val_size = len(dataset) - train_size
 
-train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+indices = list(range(len(dataset)))
+targets = dataset.targets
 
+train_idx, val_idx = train_test_split(
+    indices,
+    test_size=0.2,
+    stratify=targets,
+    random_state=42
+)
+
+train_dataset = Subset(dataset, train_idx)
+val_dataset = Subset(dataset, val_idx)
+
+print("Training samples:", len(train_dataset))
+print("Validation samples:", len(val_dataset))
 # validation should not use augmentation
 train_dataset.dataset.transform = train_transform
 val_dataset.dataset.transform = val_transform
 
 
-print("Training samples:", train_size)
-print("Validation samples:", val_size)
-
 
 # Compute Class Weights
 
-targets = dataset.targets
-class_counts = torch.bincount(torch.tensor(targets))
+train_targets = [dataset.targets[i] for i in train_idx]
+
+class_counts = torch.bincount(torch.tensor(train_targets))
 
 print("Class counts:", class_counts)
 
@@ -99,31 +124,38 @@ class_weights = 1.0 / class_counts.float()
 class_weights = class_weights / class_weights.sum()
 class_weights = class_weights.to(DEVICE)
 
-print("Class weights:", class_weights)
-
 
 # -------- Weighted Sampler (NEW PART) --------
 
-train_targets = [targets[i] for i in train_dataset.indices]
+# train_targets = [targets[i] for i in train_dataset.indices]
 
-train_class_counts = torch.bincount(torch.tensor(train_targets))
-train_class_weights = 1.0 / train_class_counts.float()
+# train_class_counts = torch.bincount(torch.tensor(train_targets))
+# train_class_weights = 1.0 / train_class_counts.float()
 
-sample_weights = [train_class_weights[t] for t in train_targets]
+val_targets = [targets[i] for i in val_dataset.indices]
+print("Val class counts:", torch.bincount(torch.tensor(val_targets)))
 
-sampler = WeightedRandomSampler(
-    weights=sample_weights,
-    num_samples=len(sample_weights),
-    replacement=True
-)
+
+# sample_weights = [train_class_weights[t] for t in train_targets]
+
+# sampler = WeightedRandomSampler(
+#     weights=sample_weights,
+#     num_samples=len(sample_weights),
+#     replacement=True
+# )
 
 
 # DataLoaders
 
+# train_loader = DataLoader(
+#     train_dataset,
+#     batch_size=BATCH_SIZE,
+#     sampler=sampler
+# )
 train_loader = DataLoader(
     train_dataset,
     batch_size=BATCH_SIZE,
-    sampler=sampler
+    shuffle=True
 )
 
 val_loader = DataLoader(
@@ -136,6 +168,7 @@ val_loader = DataLoader(
 # Initialize Model
 
 model = mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT)
+# model = mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT, width_mult=0.5)
 
 for param in model.features[:-3].parameters():
     param.requires_grad = False
@@ -148,7 +181,15 @@ print("Total MobileNet parameters:", params)
 
 
 criterion = nn.CrossEntropyLoss(weight=class_weights)
-optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
+# optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
+
+optimizer = optim.Adam(
+    filter(lambda p: p.requires_grad, model.parameters()),
+    lr=LR,
+    weight_decay=1e-4
+)
+
+# Weights of the neural network are updated -per batch
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
 
 best_val_acc = 0
@@ -231,6 +272,14 @@ for epoch in range(EPOCHS):
         best_epoch = epoch + 1
         best_val_preds = val_preds
         best_val_labels = val_labels
+
+#         quantized_model = torch.quantization.quantize_dynamic(
+#     model,
+#     {nn.Linear},
+#     dtype=torch.qint8
+# )
+#         torch.save(quantized_model.state_dict(), "mobilenet_quantized.pth")
+
         torch.save(model.state_dict(), "mobilenet_model.pth")
 
         print("Best model saved!")
@@ -272,5 +321,5 @@ model_size = os.path.getsize("mobilenet_model.pth")/(1024*1024)
 
 print("\nModel Size:", round(model_size,2),"MB")
 
-print_memory("After training finished")
+# print_memory("After training finished")
 

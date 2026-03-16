@@ -31,7 +31,7 @@ print_memory("Start")
 # TRAIN SMALL CNN
 # ----------------------------
 
-run_script("train_smallcnn.py")
+# run_script("train_smallcnn.py")
 
 
 # ----------------------------
