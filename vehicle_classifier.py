@@ -45,8 +45,8 @@ class SmallCNN(nn.Module):
 class VehicleClassifier:
     def __init__(self, model_path=None):
 
-        # self.device = torch.device("cpu")
-        self.device= torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cpu")
+        # self.device= torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # self.model = SmallCNN(num_classes=len(CLASS_IDX))
         self.model = mobilenet_v2(weights=None)
         self.model.classifier[1] = nn.Linear(
@@ -77,6 +77,8 @@ class VehicleClassifier:
     def predict(self, image_path: str) -> int:
         image = Image.open(image_path).convert("RGB")
         tensor = self.transform(image).unsqueeze(0).to(self.device).half()
+        tensor = tensor.to(self.device)
+
         with torch.no_grad():
             outputs = self.model(tensor)
             _, predicted = torch.max(outputs, 1)

@@ -24,8 +24,8 @@ from torch.utils.data import Subset
 from vehicle_classifier import SmallCNN
 
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# DEVICE=torch.device("cpu")
+# DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE=torch.device("cpu")
 
 DATASET_PATH = "dataset"
 

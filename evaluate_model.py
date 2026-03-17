@@ -23,14 +23,6 @@ TEST_PATH = "test"
 dataset = ImageFolder(TEST_PATH)
 loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
-print("\n==============================")
-print("TEST DATASET INFO")
-print("==============================")
-
-print("Class mapping:", dataset.class_to_idx)
-print("Total test samples:", len(dataset))
-
-
 
 # SMALL CNN EVALUATION
 # device = torch.device("cpu")
@@ -65,6 +57,7 @@ for i,(img,label) in enumerate(loader):
     image = Image.open(img_path_cnn).convert("RGB")
 
     tensor = transform(image).unsqueeze(0)
+    tensor = tensor.to(device)
 
     with torch.no_grad():
 

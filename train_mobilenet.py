@@ -31,9 +31,8 @@ import os
 
 
 
-
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# DEVICE = torch.device("cpu")
+# DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("cpu")
 
 DATASET_PATH = "dataset"
 
@@ -290,14 +289,6 @@ for epoch in range(EPOCHS):
         best_val_preds = val_preds
         best_val_labels = val_labels
 
-#         quantized_model = torch.quantization.quantize_dynamic(
-#     model,
-#     {nn.Linear},
-#     dtype=torch.qint8
-# )
-#         torch.save(quantized_model.state_dict(), "mobilenet_model.pth")
-
-        # torch.save(model.state_dict(), "mobilenet_model.pth")
 
         torch.save(model.state_dict(), "mobilenet_model.pth")
         print("Best model saved!")

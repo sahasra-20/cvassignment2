@@ -25,14 +25,14 @@ def run_script(script):
 # TRAIN SMALL CNN
 # ----------------------------
 
-run_script("train_smallcnn.py")
+# run_script("train_smallcnn.py")
 
 
 # ----------------------------
 # TRAIN MOBILENET
 # ----------------------------
 
-run_script("train_mobilenet.py")
+# run_script("train_mobilenet.py")
 
 
 # ----------------------------
