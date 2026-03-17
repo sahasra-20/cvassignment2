@@ -9,12 +9,28 @@ CLASSES = ["Bus","Truck","Car","Bike","None"]
 
 # Load metrics
 
-def load_metrics(path):
+def load_json(path):
 
     with open(path) as f:
         return json.load(f)
 
+def plot_accuracy(train_acc, val_acc, name):
 
+    plt.figure()
+
+    plt.plot(train_acc,label="Train")
+    plt.plot(val_acc,label="Validation")
+
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+
+    plt.title(f"{name} Accuracy")
+
+    plt.legend()
+
+    plt.savefig(f"plots/{name}_accuracy.png")
+
+    plt.close()
 def plot_loss(train_loss, val_loss, name):
 
     plt.figure()
@@ -34,23 +50,7 @@ def plot_loss(train_loss, val_loss, name):
     plt.close()
 
 
-def plot_loss(metrics,name):
 
-    plt.figure()
-
-    plt.plot(metrics["train_loss"],label="Train")
-    plt.plot(metrics["val_loss"],label="Validation")
-
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-
-    plt.title(f"{name} Loss")
-
-    plt.legend()
-
-    plt.savefig(f"plots/{name}_loss.png")
-
-    plt.close()
 def plot_confusion_matrix(cm, name):
 
     plt.figure()

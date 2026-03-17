@@ -338,7 +338,7 @@ metrics = {
     "val_loss": val_loss_list
 }
 
-with open("smallcnn_metrics.json","w") as f:
+with open("mobilenet_metrics.json","w") as f:
     json.dump(metrics,f)
 
 

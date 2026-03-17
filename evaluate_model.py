@@ -12,13 +12,15 @@ from vehicle_classifier import VehicleClassifier
 from torchvision import models, transforms
 import torch.nn as nn
 from PIL import Image
+from vehicle_classifier import SmallCNN
+
 
 import os
 
 TEST_PATH = "test"
 
 
-dataset = ImageFolder(TEST_PATH, transform=transform)
+dataset = ImageFolder(TEST_PATH)
 loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
 print("\n==============================")
@@ -28,7 +30,6 @@ print("==============================")
 print("Class mapping:", dataset.class_to_idx)
 print("Total test samples:", len(dataset))
 
-print_memory("After loading dataset")
 
 
 # SMALL CNN EVALUATION
@@ -65,14 +66,8 @@ for i,(img,label) in enumerate(loader):
 
 print("\n   SMALL CNN RESULTS   ")
 
-acc_cnn = accuracy_score(y_true,y_pred)
-smallcnn_results = {
-    "accuracy": acc,
-    "confusion_matrix": cm.tolist()
-}
 
-with open("smallcnn_test_results.json", "w") as f:
-    json.dump(smallcnn_results, f)
+acc_cnn = accuracy_score(y_true,y_pred)
 print("Accuracy:",acc_cnn*100,"%")
 print("Test Error:",(1-acc_cnn)*100,"%")
 
@@ -82,6 +77,15 @@ print(cm_cnn)
 
 print("\nClassification Report")
 print(classification_report(y_true,y_pred))
+
+smallcnn_results = {
+    "accuracy": acc_cnn,
+    "confusion_matrix": cm_cnn.tolist()
+}
+
+with open("smallcnn_test_results.json", "w") as f:
+    json.dump(smallcnn_results, f)
+
 
 print("\nPer-Class Accuracy")
 
@@ -140,13 +144,6 @@ for i,(img,label) in enumerate(loader):
 print("\n    MOBILENET RESULTS    ")
 
 acc_mobilenet = accuracy_score(y_true_mn,y_pred_mn)
-mobilenet_results = {
-    "accuracy": acc,
-    "confusion_matrix": cm.tolist()
-}
-
-with open("mobilenet_test_results.json", "w") as f:
-    json.dump(mobilenet_results, f)
 
 print("Accuracy:",acc_mobilenet*100,"%")
 print("Test Error:",(1-acc_mobilenet)*100,"%")
@@ -158,6 +155,13 @@ print(cm_mn)
 print("\nClassification Report")
 print(classification_report(y_true_mn,y_pred_mn))
 
+mobilenet_results = {
+    "accuracy": acc_mobilenet,
+    "confusion_matrix": cm_mn.tolist()
+}
+
+with open("mobilenet_test_results.json", "w") as f:
+    json.dump(mobilenet_results, f)
 
 print("\nPer-Class Accuracy")
 
