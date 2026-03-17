@@ -52,11 +52,12 @@ class VehicleClassifier:
         self.model.classifier[1] = nn.Linear(
             self.model.classifier[1].in_features, 5
         )
-        self.model = torch.quantization.quantize_dynamic(
-            self.model,
-            {nn.Linear},
-            dtype=torch.qint8
-        )
+        # self.model = torch.quantization.quantize_dynamic(
+        #     self.model,
+        #     {nn.Linear},
+        #     dtype=torch.qint8
+        # )
+        self.model.half()
         if model_path:
             self.model.load_state_dict(torch.load(model_path, map_location=self.device))
         self.model = self.model.to(self.device)
@@ -75,7 +76,7 @@ class VehicleClassifier:
 
     def predict(self, image_path: str) -> int:
         image = Image.open(image_path).convert("RGB")
-        tensor = self.transform(image).unsqueeze(0).to(self.device)
+        tensor = self.transform(image).unsqueeze(0).to(self.device).half()
         with torch.no_grad():
             outputs = self.model(tensor)
             _, predicted = torch.max(outputs, 1)
