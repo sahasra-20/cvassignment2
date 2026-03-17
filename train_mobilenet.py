@@ -298,7 +298,6 @@ for epoch in range(EPOCHS):
 #         torch.save(quantized_model.state_dict(), "mobilenet_model.pth")
 
         # torch.save(model.state_dict(), "mobilenet_model.pth")
-        model.half()
 
         torch.save(model.state_dict(), "mobilenet_model.pth")
         print("Best model saved!")
@@ -333,6 +332,13 @@ pred_counts = Counter(best_val_preds)
 for k,v in pred_counts.items():
     print(f"Class {k}: {v} predictions")
 
+
+model.load_state_dict(torch.load("mobilenet_model.pth"))
+
+# convert to half precision for compression
+model.half()
+
+torch.save(model.state_dict(), "mobilenet_model.pth")
 
 model_size = os.path.getsize("mobilenet_model.pth")/(1024*1024)
 print("\nModel Size:", round(model_size,2),"MB")

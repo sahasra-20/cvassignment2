@@ -25,7 +25,7 @@ def run_script(script):
 # TRAIN SMALL CNN
 # ----------------------------
 
-# run_script("train_smallcnn.py")
+run_script("train_smallcnn.py")
 
 
 # ----------------------------
