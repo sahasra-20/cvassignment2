@@ -1,9 +1,13 @@
 import torch
 import torch.nn as nn # layers (Conv2d, Linear) loss functions activation functions
 import torch.optim as optim  # Imports optimization algorithms Adam SGD RMSprop
+import os
+import json
 
 from sklearn.metrics import confusion_matrix, classification_report
+
 from collections import Counter
+from sklearn.model_selection import train_test_split
 
 
 from PIL import Image
@@ -14,29 +18,10 @@ from torchvision.datasets import ImageFolder
 from torchvision import transforms  # transforms are used for image preprocessing and augmentation.
 from torch.utils.data import DataLoader, random_split
 
+from torch.utils.data import Subset
+
 # import the given model
 from vehicle_classifier import SmallCNN
-
-import subprocess
-import time
-import os
-import psutil
-
-
-# ============================
-# MEMORY FUNCTION
-# ============================
-
-# def print_memory(stage):
-#     process = psutil.Process(os.getpid())
-#     mem = process.memory_info().rss / (1024**2)
-#     print(f"[MEMORY] {stage}: {mem:.2f} MB")
-
-BATCH_SIZE = 32
-EPOCHS = 20
-LR = 0.001
-IMG_SIZE = 32
-print("Initial Learning Rate:", LR)
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -62,7 +47,11 @@ for root, dirs, files in os.walk(DATASET_PATH):
 
 train_transform = transforms.Compose([
     # transforms.Resize((IMG_SIZE, IMG_SIZE)),
-    transforms.RandomResizedCrop(IMG_SIZE),
+    # transforms.RandomResizedCrop(IMG_SIZE),
+    transforms.RandomResizedCrop(
+    IMG_SIZE,
+    scale=(0.6,1.0)
+),
     transforms.RandomHorizontalFlip(),
     transforms.RandomRotation(12),
     transforms.ColorJitter(
@@ -81,7 +70,6 @@ val_transform = transforms.Compose([
     transforms.Normalize([0.5,0.5,0.5],[0.5,0.5,0.5])
 ])
 
-# from torch.utils.data import WeightedRandomSampler
 
 # Load Dataset
 
@@ -90,15 +78,6 @@ dataset = ImageFolder(DATASET_PATH)
 train_size = int(0.8 * len(dataset))
 val_size = len(dataset) - train_size
 
-# train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
-
-# # validation should not use augmentation
-# train_dataset.dataset.transform = train_transform
-# val_dataset.dataset.transform = val_transform
-
-
-# print("Training samples:", train_size)
-# print("Validation samples:", val_size)
 
 indices = list(range(len(dataset)))
 targets = dataset.targets
@@ -116,6 +95,7 @@ val_dataset = Subset(dataset, val_idx)
 print("Training samples:", len(train_dataset))
 print("Validation samples:", len(val_dataset))
 # validation should not use augmentation
+
 train_dataset.dataset.transform = train_transform
 val_dataset.dataset.transform = val_transform
 
@@ -159,6 +139,7 @@ print("Val class counts:", torch.bincount(torch.tensor(val_targets)))
 #     batch_size=BATCH_SIZE,
 #     sampler=sampler
 # )
+
 train_loader = DataLoader(
     train_dataset,
     batch_size=BATCH_SIZE,
@@ -178,7 +159,10 @@ model = SmallCNN(num_classes=5).to(DEVICE)
 params = sum(p.numel() for p in model.parameters())
 print("Total SmallCNN parameters:", params)
 
-criterion = nn.CrossEntropyLoss(weight=class_weights)
+criterion = nn.CrossEntropyLoss(
+    weight=class_weights,
+    label_smoothing=0.1
+)
 optimizer = optim.Adam(
     filter(lambda p: p.requires_grad, model.parameters()),
     lr=LR,
@@ -193,6 +177,12 @@ best_val_preds = None
 best_val_labels = None
 
 # Training Loop
+train_acc_list = []
+val_acc_list = []
+
+train_loss_list = []
+val_loss_list = []
+
 
 for epoch in range(EPOCHS):
 
@@ -229,7 +219,7 @@ for epoch in range(EPOCHS):
     val_preds = []
     val_labels = []
 
-
+    val_loss= 0
     correct = 0
     total = 0
 
@@ -242,10 +232,13 @@ for epoch in range(EPOCHS):
 
             outputs = model(images)
 
+            loss = criterion(outputs, labels)
+            val_loss += loss.item()
             _, predicted = torch.max(outputs, 1)
 
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
+
             val_preds.extend(predicted.cpu().numpy())
             val_labels.extend(labels.cpu().numpy())
 
@@ -254,8 +247,14 @@ for epoch in range(EPOCHS):
     print(f"Epoch {epoch+1}/{EPOCHS}")
     print("Current LR:", optimizer.param_groups[0]['lr'])
     print(f"Train Loss: {train_loss:.3f}")
+    print(f"Val Loss: {val_loss:.3f}")
     print(f"Train Accuracy: {train_acc:.2f}%")
     print(f"Validation Accuracy: {val_acc:.2f}%")
+    train_acc_list.append(train_acc)
+    val_acc_list.append(val_acc)
+
+    train_loss_list.append(train_loss)
+    val_loss_list.append(val_loss)
     print("------------------------------------------------")
 
     
@@ -279,31 +278,37 @@ print("Best Epoch:", best_epoch)
 print("Best Validation Accuracy:", round(best_val_acc,2),"%")
 
 cm = confusion_matrix(best_val_labels, best_val_preds)
-
 print("\nConfusion Matrix")
+
 print("(Rows = Actual, Columns = Predicted)")
 print(cm)
 
 print("\nClassification Report")
+
 print(classification_report(best_val_labels, best_val_preds))
 
 print("\nPer-Class Accuracy")
+
 for i in range(cm.shape[0]):
-
     acc = cm[i,i] / cm[i].sum()
-
     print(f"Class {i} accuracy: {acc:.3f}")
 
 print("\nPrediction Distribution")
 
 pred_counts = Counter(best_val_preds)
-
 for k,v in pred_counts.items():
-
     print(f"Class {k}: {v} predictions")
 
-model_size = os.path.getsize("smallcnn_model.pth")/(1024*1024)
 
+model_size = os.path.getsize("smallcnn_model.pth")/(1024*1024)
 print("\nModel Size:", round(model_size,2),"MB")
 
-# print_memory("After training finished")
+metrics = {
+    "train_acc": train_acc_list,
+    "val_acc": val_acc_list,
+    "train_loss": train_loss_list,
+    "val_loss": val_loss_list
+}
+
+with open("smallcnn_metrics.json","w") as f:
+    json.dump(metrics,f)

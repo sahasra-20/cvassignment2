@@ -17,9 +17,9 @@ os.makedirs(dst, exist_ok=True)
 
 images = [f for f in os.listdir(src) if f.endswith((".png",".jpg",".jpeg",".JPEG"))]
 
-selected = random.sample(images, 2500)
+selected = random.sample(images, 3500)
 
 for img in selected:
     shutil.copy(os.path.join(src, img), os.path.join(dst, img))
 
-print("2500 random images copied to dataset/none")
+print("3500 random images copied to dataset/none")

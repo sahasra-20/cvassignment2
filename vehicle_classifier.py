@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision import transforms
+from torchvision import models,transforms
 from PIL import Image
 
 # -----------------------------
@@ -43,20 +43,26 @@ class SmallCNN(nn.Module):
 # -----------------------------
 class VehicleClassifier:
     def __init__(self, model_path=None):
+
         # self.device = torch.device("cpu")
         self.device= torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = SmallCNN(num_classes=len(CLASS_IDX))
-        self.model = self.model.to(self.device)
+        # self.model = SmallCNN(num_classes=len(CLASS_IDX))
+        self.model = models.mobilenet_v2(weights=None, width_mult=0.5)
+
+        self.model.classifier[1] = nn.Linear(self.model.last_channel, 5)
         if model_path:
             self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+        self.model = self.model.to(self.device)
         self.model.eval()
 
         # Preprocessing pipeline
         self.transform = transforms.Compose([
-            transforms.Resize((32, 32)),
+            transforms.Resize((224,224)),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5, 0.5, 0.5],
-                                 std=[0.5, 0.5, 0.5])
+            transforms.Normalize(
+                [0.485,0.456,0.406],
+                [0.229,0.224,0.225]
+            )
         ])
 
     def predict(self, image_path: str) -> int:
@@ -72,5 +78,5 @@ class VehicleClassifier:
 # -----------------------------
 if __name__ == "__main__":
     classifier = VehicleClassifier(model_path="student_model.pth")  # load your trained weights
-    idx = classifier.predict("test_image.jpg")
+    idx = classifier.predict("test.jpg")
     print(f"Predicted Class Index: {idx}, Label: {CLASS_IDX[idx]}")

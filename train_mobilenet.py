@@ -1,12 +1,15 @@
 import torch
+import json
 import torch.nn as nn
 import torch.optim as optim
 from sklearn.metrics import confusion_matrix, classification_report
 from collections import Counter
+from visualizations import plot_accuracy, plot_loss, plot_confusion
 
-import torch.quantization
+# import torch.quantization
+# from torch.utils.data import WeightedRandomSampler
 
-from torch.utils.data import WeightedRandomSampler
+from sklearn.model_selection import train_test_split
 
 from torchvision.datasets import ImageFolder
 from torchvision import transforms
@@ -18,24 +21,13 @@ from PIL import Image
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-from sklearn.model_selection import train_test_split
+
 from torch.utils.data import Subset
 
 import os
-# import subprocess
-import time
-import os
-# import psutil
 
 
 
-# MEMORY FUNCTION
-
-
-# def print_memory(stage):
-#     process = psutil.Process(os.getpid())
-#     mem = process.memory_info().rss / (1024**2)
-#     print(f"[MEMORY] {stage}: {mem:.2f} MB")
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -62,7 +54,10 @@ for root, dirs, files in os.walk(DATASET_PATH):
 
 train_transform = transforms.Compose([
     # transforms.Resize((IMG_SIZE,IMG_SIZE)),
-    transforms.RandomResizedCrop(IMG_SIZE),
+    transforms.RandomResizedCrop(
+    IMG_SIZE,
+    scale=(0.6,1.0)
+),
     transforms.RandomHorizontalFlip(),
     transforms.RandomRotation(12),
     transforms.ColorJitter(
@@ -84,7 +79,6 @@ val_transform = transforms.Compose([
                          [0.229,0.224,0.225])
 ])
 
-# from torch.utils.data import WeightedRandomSampler
 
 # Load Dataset
 
@@ -106,6 +100,7 @@ val_dataset = Subset(dataset, val_idx)
 
 print("Training samples:", len(train_dataset))
 print("Validation samples:", len(val_dataset))
+
 # validation should not use augmentation
 train_dataset.dataset.transform = train_transform
 val_dataset.dataset.transform = val_transform
@@ -124,6 +119,9 @@ class_weights = 1.0 / class_counts.float()
 class_weights = class_weights / class_weights.sum()
 class_weights = class_weights.to(DEVICE)
 
+val_targets = [targets[i] for i in val_dataset.indices]
+print("Val class counts:", torch.bincount(torch.tensor(val_targets)))
+
 
 # -------- Weighted Sampler (NEW PART) --------
 
@@ -132,10 +130,6 @@ class_weights = class_weights.to(DEVICE)
 # train_class_counts = torch.bincount(torch.tensor(train_targets))
 # train_class_weights = 1.0 / train_class_counts.float()
 
-val_targets = [targets[i] for i in val_dataset.indices]
-print("Val class counts:", torch.bincount(torch.tensor(val_targets)))
-
-
 # sample_weights = [train_class_weights[t] for t in train_targets]
 
 # sampler = WeightedRandomSampler(
@@ -143,15 +137,15 @@ print("Val class counts:", torch.bincount(torch.tensor(val_targets)))
 #     num_samples=len(sample_weights),
 #     replacement=True
 # )
-
-
-# DataLoaders
-
 # train_loader = DataLoader(
 #     train_dataset,
 #     batch_size=BATCH_SIZE,
 #     sampler=sampler
 # )
+
+
+# DataLoaders
+
 train_loader = DataLoader(
     train_dataset,
     batch_size=BATCH_SIZE,
@@ -167,9 +161,8 @@ val_loader = DataLoader(
 
 # Initialize Model
 
-model = mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT)
-# model = mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT, width_mult=0.5)
-
+# model = mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT)
+model = mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT, width_mult=0.5)
 for param in model.features[:-3].parameters():
     param.requires_grad = False
 
@@ -180,7 +173,10 @@ params = sum(p.numel() for p in model.parameters())
 print("Total MobileNet parameters:", params)
 
 
-criterion = nn.CrossEntropyLoss(weight=class_weights)
+criterion = nn.CrossEntropyLoss(
+    weight=class_weights,
+    label_smoothing=0.1
+)
 # optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
 
 optimizer = optim.Adam(
@@ -191,6 +187,13 @@ optimizer = optim.Adam(
 
 # Weights of the neural network are updated -per batch
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+
+#Training
+train_acc_list = []
+val_acc_list = []
+
+train_loss_list = []
+val_loss_list = []
 
 best_val_acc = 0
 best_epoch=1
@@ -235,6 +238,7 @@ for epoch in range(EPOCHS):
     val_preds = []
     val_labels = []
 
+    val_loss=0
     correct = 0
     total = 0
 
@@ -247,6 +251,9 @@ for epoch in range(EPOCHS):
 
             outputs = model(images)
 
+            loss = criterion(outputs, labels)
+
+            val_loss += loss.item()
             _,predicted = torch.max(outputs,1)
             
 
@@ -261,8 +268,14 @@ for epoch in range(EPOCHS):
     print(f"Epoch {epoch+1}/{EPOCHS}")
     print("Current LR:", optimizer.param_groups[0]['lr'])
     print(f"Train Loss: {train_loss:.3f}")
+    print(f"Val Loss: {val_loss:.3f}")
     print(f"Train Accuracy: {train_acc:.2f}%")
     print(f"Validation Accuracy: {val_acc:.2f}%")
+    train_acc_list.append(train_acc)
+    val_acc_list.append(val_acc)
+
+    train_loss_list.append(train_loss)
+    val_loss_list.append(val_loss)
     print("------------------------------------------------")
 
 
@@ -303,23 +316,29 @@ print("\nClassification Report")
 print(classification_report(best_val_labels, best_val_preds))
 
 print("\nPer-Class Accuracy")
+
 for i in range(cm.shape[0]):
-
     acc = cm[i,i] / cm[i].sum()
-
     print(f"Class {i} accuracy: {acc:.3f}")
 
 print("\nPrediction Distribution")
 
 pred_counts = Counter(best_val_preds)
-
 for k,v in pred_counts.items():
-
     print(f"Class {k}: {v} predictions")
 
-model_size = os.path.getsize("mobilenet_model.pth")/(1024*1024)
 
+model_size = os.path.getsize("mobilenet_model.pth")/(1024*1024)
 print("\nModel Size:", round(model_size,2),"MB")
 
-# print_memory("After training finished")
+metrics = {
+    "train_acc": train_acc_list,
+    "val_acc": val_acc_list,
+    "train_loss": train_loss_list,
+    "val_loss": val_loss_list
+}
+
+with open("smallcnn_metrics.json","w") as f:
+    json.dump(metrics,f)
+
 
