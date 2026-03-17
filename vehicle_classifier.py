@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models,transforms
+from torchvision.models import mobilenet_v2
 from PIL import Image
 
 # -----------------------------
@@ -47,13 +48,20 @@ class VehicleClassifier:
         # self.device = torch.device("cpu")
         self.device= torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # self.model = SmallCNN(num_classes=len(CLASS_IDX))
-        self.model = models.mobilenet_v2(weights=None, width_mult=0.5)
-
-        self.model.classifier[1] = nn.Linear(self.model.last_channel, 5)
+        self.model = mobilenet_v2(weights=None)
+        self.model.classifier[1] = nn.Linear(
+            self.model.classifier[1].in_features, 5
+        )
+        self.model = torch.quantization.quantize_dynamic(
+            self.model,
+            {nn.Linear},
+            dtype=torch.qint8
+        )
         if model_path:
             self.model.load_state_dict(torch.load(model_path, map_location=self.device))
         self.model = self.model.to(self.device)
         self.model.eval()
+
 
         # Preprocessing pipeline
         self.transform = transforms.Compose([

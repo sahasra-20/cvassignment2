@@ -33,6 +33,8 @@ print("Total test samples:", len(dataset))
 
 
 # SMALL CNN EVALUATION
+# device = torch.device("cpu")
+device= torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 cnn_model =SmallCNN(num_classes=5)
 cnn_model.load_state_dict(torch.load("smallcnn_model.pth", map_location=device))
@@ -44,6 +46,15 @@ transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize([0.5,0.5,0.5],[0.5,0.5,0.5])
 ])
+dataset = ImageFolder(TEST_PATH, transform=transform)
+loader = DataLoader(dataset, batch_size=1, shuffle=False)
+
+print("\n==============================")
+print("TEST DATASET INFO")
+print("==============================")
+
+print("Class mapping:", dataset.class_to_idx)
+print("Total test samples:", len(dataset))
 
 y_true = []
 y_pred = []
@@ -128,6 +139,8 @@ print("==============================")
 #     transforms.ToTensor(),
 #     transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
 # ])
+
+dataset = ImageFolder(TEST_PATH)
 classifier = VehicleClassifier("mobilenet_model.pth")
 
 y_true_mn = []

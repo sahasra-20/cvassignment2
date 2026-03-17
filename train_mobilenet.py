@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 from sklearn.metrics import confusion_matrix, classification_report
 from collections import Counter
-from visualizations import plot_accuracy, plot_loss, plot_confusion
+
 
 # import torch.quantization
 # from torch.utils.data import WeightedRandomSampler
@@ -17,6 +17,8 @@ from torchvision import models # Used to load pretrained models.
 from torch.utils.data import DataLoader, random_split
 from torchvision.models import mobilenet_v2, MobileNet_V2_Weights
 from PIL import Image
+
+from vehicle_classifier import VehicleClassifier
 
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -161,12 +163,12 @@ val_loader = DataLoader(
 
 # Initialize Model
 
-# model = mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT)
-model = mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT, width_mult=0.5)
+model = mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT)
+# model = mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT, width_mult=0.5)
 for param in model.features[:-3].parameters():
     param.requires_grad = False
 
-model.classifier[1] = nn.Linear(model.last_channel, 5)
+model.classifier[1] = nn.Linear(model.classifier[1].in_features, 5)
 model = model.to(DEVICE)
 
 params = sum(p.numel() for p in model.parameters())
@@ -264,7 +266,9 @@ for epoch in range(EPOCHS):
 
     val_acc = 100 * correct / total
     
-    train_loss = train_loss
+    # train_loss = train_loss
+    train_loss = train_loss/len(train_loader)
+    val_loss=val_loss/len(val_loader)
     print(f"Epoch {epoch+1}/{EPOCHS}")
     print("Current LR:", optimizer.param_groups[0]['lr'])
     print(f"Train Loss: {train_loss:.3f}")
@@ -286,14 +290,14 @@ for epoch in range(EPOCHS):
         best_val_preds = val_preds
         best_val_labels = val_labels
 
-#         quantized_model = torch.quantization.quantize_dynamic(
-#     model,
-#     {nn.Linear},
-#     dtype=torch.qint8
-# )
-#         torch.save(quantized_model.state_dict(), "mobilenet_quantized.pth")
+        quantized_model = torch.quantization.quantize_dynamic(
+    model,
+    {nn.Linear},
+    dtype=torch.qint8
+)
+        torch.save(quantized_model.state_dict(), "mobilenet.pth")
 
-        torch.save(model.state_dict(), "mobilenet_model.pth")
+        # torch.save(model.state_dict(), "mobilenet_model.pth")
 
         print("Best model saved!")
     scheduler.step()

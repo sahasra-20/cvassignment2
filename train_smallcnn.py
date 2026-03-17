@@ -243,7 +243,8 @@ for epoch in range(EPOCHS):
             val_labels.extend(labels.cpu().numpy())
 
     val_acc = 100 * correct / total
-    train_loss = train_loss
+    train_loss = train_loss/len(train_loader)
+    val_loss=val_loss/len(val_loader)
     print(f"Epoch {epoch+1}/{EPOCHS}")
     print("Current LR:", optimizer.param_groups[0]['lr'])
     print(f"Train Loss: {train_loss:.3f}")
